@@ -1,63 +1,68 @@
 package com.iradetskiy.vkapi;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 
 
-public class VKUsersGetResponse {
+public class VKUsersGetResponse extends DefaultHandler {
 	
 	public final static String USER = "user";
 	
-	private List<VKUserItem> items;
+	private String thisElement;
+	private VKUserItem item;
+	private List<VKUserItem> items = new ArrayList<VKUserItem>();
 	
-	public VKUsersGetResponse(String response) throws XmlPullParserException, IOException {
-		parseResponse(response);
+	public static VKUsersGetResponse fromXml(String xml) {
+		VKUsersGetResponse response = new VKUsersGetResponse(); 
+		try {
+			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+			parser.parse(new ByteArrayInputStream(xml.getBytes()), response);
+		} catch (SAXException | IOException | ParserConfigurationException e) {
+			e.printStackTrace();
+		}
+		return response;
 	}
 	
-	public void parseResponse(String response) throws XmlPullParserException, IOException {
-		XmlPullParser xpp = XmlPullParserFactory.newInstance().newPullParser();
-		xpp.setInput(new StringReader(response));
-		int eventType = xpp.getEventType();
+	@Override
+	public void startElement(String namespaceURI, String localName, String qName, Attributes atts) throws SAXException {
+	  thisElement = qName; 
+	}
+
+	@Override
+	public void endElement(String namespaceURI, String localName, String qName) throws SAXException {
+	  thisElement = "";
+	  if (qName.equals(USER)) {
+      	items.add(item);
+      }
+	}
+
+	@Override
+	public void characters(char[] ch, int start, int length) throws SAXException {
+		if (thisElement.equals(USER)) {
+        	item = new VKUserItem();
+        }
 		
-		VKUserItem item = null;
-		items = new ArrayList<VKUserItem>();
-		
-		while(eventType != XmlPullParser.END_DOCUMENT){
-			
-			if(eventType == XmlPullParser.START_TAG) {
-	            
-				if (xpp.getName().equals(USER)) {
-	            	item = new VKUserItem();
-	            }
-				
-	            if (xpp.getName().equals(VKGetUsersRequest.FIELD_FIRST_NAME)) {
-	            	item.first_name = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKGetUsersRequest.FIELD_LAST_NAME)) {
-	            	item.last_name = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKGetUsersRequest.FIELD_UID)) {
-	            	item.uid = xpp.nextText();
-	            }
-	        	
-	        } else if(eventType == XmlPullParser.END_TAG) {
-	            
-	        	if (xpp.getName().equals(USER)) {
-	            	items.add(item);
-	            }
-	        	
-	        }
-			
-			eventType = xpp.next();
-		}
+        if (thisElement.equals(VKGetUsersRequest.FIELD_FIRST_NAME)) {
+        	item.first_name = new String(ch, start, length);
+        }
+        
+        if (thisElement.equals(VKGetUsersRequest.FIELD_LAST_NAME)) {
+        	item.last_name = new String(ch, start, length);
+        }
+        
+        if (thisElement.equals(VKGetUsersRequest.FIELD_UID)) {
+        	item.uid = new String(ch, start, length);
+        }
 	}
 	
 	public List<VKUserItem> getResults() {

@@ -1,96 +1,76 @@
 package com.iradetskiy.vkapi;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 
-public class VKAudioSearchResponse {
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class VKAudioSearchResponse extends DefaultHandler{
 	public static final String AUDIO = "audio";
 	public static final String COUNT = "count";
 	
-	private int count;
-	private List<VKAudioItem> items;
-	private VKAudioSearchRequest mRequest;
-	
-	public VKAudioSearchResponse(String responseXml) throws XmlPullParserException, IOException{
-		parseResponseXml(responseXml);
-	}
-	
-	public void parseResponseXml(String responseXml) throws XmlPullParserException, IOException{
-				
-		XmlPullParser xpp = XmlPullParserFactory.newInstance().newPullParser();
-		xpp.setInput(new StringReader(responseXml));
-		int eventType = xpp.getEventType();
-		
-		VKAudioItem item = null;
-		items = new ArrayList<VKAudioItem>();
-		
-		while(eventType != XmlPullParser.END_DOCUMENT){
-			
-			if(eventType == XmlPullParser.START_TAG) {
-	        	
-	            if (xpp.getName().equals(COUNT)) {
-	            	count = Integer.parseInt(xpp.nextText());
-	            	if (count == 0) {
-	            		return;
-	            	}
-	            }
-	            
-	            if (xpp.getName().equals(AUDIO)) {
-	            	item = new VKAudioItem();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.AID)) {
-	            	item.aid = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.OID)) {
-	            	item.owner_id = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.ARTIST)) {
-	            	item.artist = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.TITLE)) {
-	            	item.title = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.DURATION)) {
-	            	item.duration = Integer.parseInt(xpp.nextText());//TimeUtility.formatSeconds(xpp.nextText());
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.URL)) {
-	            	item.url = xpp.nextText();
-	            }
-	            
-	            if (xpp.getName().equals(VKAudioItem.LYRICS_ID)) {
-	            	item.lyrics_id = xpp.nextText();
-	            }
-	        	
-	        } else if(eventType == XmlPullParser.END_TAG) {
-	            
-	        	if (xpp.getName().equals(AUDIO)) {
-	            	items.add(item);
-	            }
-	        	
-	        }
-			
-			eventType = xpp.next();
+	private int mTotalCount;
+	private List<VKAudioItem> items = new ArrayList<VKAudioItem>();
+	private String thisElement;
+	private VKAudioItem item;
+
+	public static VKAudioSearchResponse fromXml(String xml) {
+		VKAudioSearchResponse response = new VKAudioSearchResponse(); 
+		try {
+			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+			parser.parse(new ByteArrayInputStream(xml.getBytes()), response);
+		} catch (SAXException | IOException | ParserConfigurationException e) {
+			e.printStackTrace();
 		}
+		return response;
 	}
 	
-	void setRequest(VKAudioSearchRequest request) {
-		mRequest = request;
+	@Override
+	public void startElement(String namespaceURI, String localName, String qName, Attributes atts) throws SAXException {
+	  thisElement = qName; 
 	}
-	
-	public VKAudioSearchRequest getRequest() {
-		return mRequest;
+
+	@Override
+	public void endElement(String namespaceURI, String localName, String qName) throws SAXException {
+	  thisElement = "";
+	  if (qName.equals(AUDIO)) {
+      	items.add(item);
+      }
+	}
+
+	@Override
+	public void characters(char[] ch, int start, int length) throws SAXException {
+		
+		if (thisElement.equals(COUNT)) {
+        	mTotalCount = Integer.parseInt(new String(ch, start, length));
+        	if (mTotalCount == 0) {
+        		return;
+        	}
+        } else if (thisElement.equals(AUDIO)) {
+        	item = new VKAudioItem();
+        } else if (thisElement.equals(VKAudioItem.AID)) {
+        	item.aid = new String(ch, start, length);
+        } else if (thisElement.equals(VKAudioItem.OID)) {
+        	item.owner_id = new String(ch, start, length);
+        } else if (thisElement.equals(VKAudioItem.ARTIST)) {
+        	item.artist = new String(ch, start, length);
+        } else if (thisElement.equals(VKAudioItem.TITLE)) {
+        	item.title = new String(ch, start, length);
+        } else if (thisElement.equals(VKAudioItem.DURATION)) {
+        	item.duration = Integer.parseInt(new String(ch, start, length));
+        } else if (thisElement.equals(VKAudioItem.URL)) {
+        	item.url = new String(ch, start, length);
+        } else if (thisElement.equals(VKAudioItem.LYRICS_ID)) {
+        	item.lyrics_id = new String(ch, start, length);
+        }
 	}
 	
 	public List<VKAudioItem> getItems() {
@@ -98,6 +78,6 @@ public class VKAudioSearchResponse {
 	}
 	
 	public int getCount() {
-		return count;
+		return mTotalCount;
 	}
 }

@@ -1,26 +1,20 @@
 package com.iradetskiy.vkapi;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
-import org.xmlpull.v1.XmlPullParserException;
-
-import android.util.Log;
-
-
 public class VKApi {
 	
 	public static final String TAG = VKApi.class.getName();
 	
-	private String mUserId;
 	private String mAccessToken;
 	private static VKApi mApi;
 	
@@ -30,67 +24,61 @@ public class VKApi {
 	public final static String ACCESS_TOKEN = "access_token";
 	public final static String USER_ID = "user_id";
 	
-	private VKApi(String accessToken, String userId) {
+	private VKApi(String accessToken) {
 		mAccessToken = accessToken;
-		mUserId = userId;
 	}
 
 	public static VKApi getApi() {
 		return mApi;
 	}
 	
-	public static VKApi getApi(String accessToken, String userId) {
+	public static VKApi getApi(String accessToken) {
 		if (mApi == null) {
-			mApi = new VKApi(accessToken, userId);
+			mApi = new VKApi(accessToken);
 		}
 		return mApi;
-	}
-	
-	public String getUserId() {
-		return mUserId;
 	}
 	
 	public String getAccessToken() {
 		return mAccessToken;
 	}
 	
-	public VKAudioSearchResponse searchAudio(VKAudioSearchRequest request) throws IOException, XmlPullParserException {
+	public VKAudioSearchResponse searchAudio(VKAudioSearchRequest request) {
 		
-		VKAudioSearchResponse response = new VKAudioSearchResponse(getResponse(composeRequest("/audio.search.xml",
-				new String[]{VKAudioSearchRequest.Q, VKAudioSearchRequest.AUTO_COMPLETE, VKAudioSearchRequest.SORT, 
-					VKAudioSearchRequest.LYRICS, VKAudioSearchRequest.COUNT, VKAudioSearchRequest.OFFSET, ACCESS_TOKEN},
-				new String[]{request.q, Integer.toString(request.auto_complete), Integer.toString(request.sort),
-					Integer.toString(request.lyrics), Integer.toString(request.count), Integer.toString(request.offset), mAccessToken})));	
+		String[] keys = {VKAudioSearchRequest.Q, VKAudioSearchRequest.AUTO_COMPLETE, VKAudioSearchRequest.SORT, 
+				VKAudioSearchRequest.LYRICS, VKAudioSearchRequest.COUNT, VKAudioSearchRequest.OFFSET, ACCESS_TOKEN};
+		String[] values = {request.q, Integer.toString(request.auto_complete), Integer.toString(request.sort),
+				Integer.toString(request.lyrics), Integer.toString(request.count), Integer.toString(request.offset), mAccessToken};
 		
-		response.setRequest(request);
+		URI requestURI = composeRequest("/audio.search.xml", keys, values);
+		String responseXML = getResponse(requestURI);
+		VKAudioSearchResponse response = VKAudioSearchResponse.fromXml(responseXML);
 		
-        return response;
+		return response;
     }
 
-	public VKUsersGetResponse getUsers(VKGetUsersRequest request) throws XmlPullParserException, IOException {
+	public VKUsersGetResponse getUsers(VKGetUsersRequest request) {
 		
-		HashMap<String, String> query = new HashMap<String, String>();
-		query.put(VKGetUsersRequest.UIDS, request.uids);
-		query.put(VKGetUsersRequest.FIELDS, request.fields);
-		query.put(VKGetUsersRequest.NAME_CASE, request.name_case);
-		query.put(ACCESS_TOKEN, mAccessToken);
+		String[] keys = {VKGetUsersRequest.UIDS, VKGetUsersRequest.FIELDS, VKGetUsersRequest.NAME_CASE, ACCESS_TOKEN};
+		String[] values = {request.uids, request.fields, request.name_case, mAccessToken};
 		
-		URI requestURI = composeRequest("/users.get.xml", query);
+		URI requestURI = composeRequest("/users.get.xml", keys, values);
 		String responseXML = getResponse(requestURI);
-		VKUsersGetResponse response = new VKUsersGetResponse(responseXML);
+		VKUsersGetResponse response = VKUsersGetResponse.fromXml(responseXML);
 		
 		return response;
 	}
 	
-	public VKAudioGetResponse getAudio(VKAudioGetRequest request) throws XmlPullParserException, IOException {
+	public VKAudioGetResponse getAudio(VKAudioGetRequest request) {
 		
-		VKAudioGetResponse response = new VKAudioGetResponse(getResponse(composeRequest("/audio.get.xml", 
-			new String[]{VKAudioGetRequest.UID, VKAudioGetRequest.GID, VKAudioGetRequest.ALBUM_ID, VKAudioGetRequest.AIDS, VKAudioGetRequest.NEED_USER,
-				VKAudioGetRequest.COUNT, VKAudioGetRequest.OFFSET, ACCESS_TOKEN}, 
-			new String[]{request.uid, request.gid, request.album_id, request.aids, Integer.toString(request.need_user), 
-				Integer.toString(request.count), Integer.toString(request.offset), mAccessToken})));
+		String[] keys = {VKAudioGetRequest.UID, VKAudioGetRequest.GID, VKAudioGetRequest.ALBUM_ID, VKAudioGetRequest.AIDS, VKAudioGetRequest.NEED_USER,
+				VKAudioGetRequest.COUNT, VKAudioGetRequest.OFFSET, ACCESS_TOKEN};
+		String[] values = {request.uid, request.gid, request.album_id, request.aids, Integer.toString(request.need_user), 
+				Integer.toString(request.count), Integer.toString(request.offset), mAccessToken};
 		
-		response.setRequest(request);
+		URI requestURI = composeRequest("/audio.get.xml", keys, values);
+		String responseXML = getResponse(requestURI);
+		VKAudioGetResponse response = VKAudioGetResponse.fromXml(responseXML);
 		
 		return response;
 	}
@@ -128,8 +116,8 @@ public class VKApi {
 		
 		try {
 			uri = new URI(SCHEME, AUTHORITY, PATH + method,  request, null);
-		} catch (URISyntaxException e) {
-			Log.e(TAG, e.getMessage());
+		} 
+		catch (URISyntaxException e) {
 		}
 		
 		return uri;
@@ -147,26 +135,38 @@ public class VKApi {
 		try {
 			uri = new URI(SCHEME, AUTHORITY, PATH + method,  request, null);
 		} catch (URISyntaxException e) {
-			Log.e(TAG, e.getMessage());
+
 		}
 		
 		return uri;
 	}
 
 	private String getResponse(URI uri) {
-		String response = null;
-		
-		HttpClient client = new DefaultHttpClient();
-		HttpGet request = new HttpGet(uri); 
-		
+		String res = null;
+		HttpURLConnection connection = null;
 		try {
-			response = EntityUtils.toString(client.execute(request).getEntity());
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
+			connection = (HttpURLConnection) uri.toURL()
+					.openConnection();
+			connection.setDoOutput(true);
+			
+			DataOutputStream wr = new DataOutputStream(connection
+					.getOutputStream());
+			wr.flush();
+			wr.close();
+			
+			InputStream is = connection.getInputStream();
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(is));
+		    String line;
+		    StringBuffer response = new StringBuffer(); 
+		    while((line = rd.readLine()) != null) {
+		      response.append(line);
+		    }
+		    rd.close();
+		    res = response.toString();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return response;
+		return res;
 	}
 }
 
